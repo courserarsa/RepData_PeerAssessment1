@@ -9,7 +9,7 @@ taken in 5 minute intervals each day.
 **Source Data**  
 Dataset: Activity monitoring data [52K]
 Format: Comma-separated-value (CSV) file containing 17,568 observations
-Variables:  
+Variables (288 5-minute intervals per day, for 61 days):  
 - steps: Number of steps taken per 5-minute interval (missing values are
 coded as NA)  
 - date: The date on which the measurement was taken in YYYY-MM-DD
@@ -24,16 +24,16 @@ taken
 unzip("./activity.zip")
 stepDat = read.csv("./activity.csv")
 stepDat$date = as.Date(stepDat$date)
-stepDat$steps = as.numeric(stepDat$steps)
+stepDat$steps = as.integer(stepDat$steps)
 
-# Format plot data by each of the 61 daily observations of the 288 5-minute intervals reported per day, adding the daily total and mean
+# Format plot data by each of the daily observations reported and calculate each day's total and mean
 library(reshape2)
 library(dplyr)
 wideDatd = dcast(stepDat, date ~ interval, value.var = "steps")
 wideDatd = mutate(wideDatd,dayTotal=rowSums(wideDatd[,2:289],na.rm=TRUE),
             dayMean=rowMeans(wideDatd[,2:289],na.rm=TRUE))
 
-# Format plot data by each of the 288 5-minute interval observations for the 61 days reported, adding the interval total and mean
+# Format plot data by each of the daily 5-minute interval observations reported and calculate each interval's total and mean
 wideDati = dcast(stepDat, interval ~ date, value.var = "steps")
 wideDati = mutate(wideDati,intvlTotal=rowSums(wideDati[,2:62],na.rm=TRUE),
             intvlMean=rowMeans(wideDati[,2:62],na.rm=TRUE))
@@ -48,7 +48,7 @@ wideDati = mutate(wideDati,intvlTotal=rowSums(wideDati[,2:62],na.rm=TRUE),
 library(ggplot2)
 p1 = ggplot(wideDatd, aes(wideDatd$dayTotal)) + 
     geom_histogram(color = "black", fill = "lightblue", binwidth = 1000) +
-    labs(x = "Total Daily Steps Taken", y = "Number of Days")
+    labs(x = "Daily Total Steps Taken", y = "Number of Days")
 print(p1)
 ```
 
@@ -67,7 +67,7 @@ totalSteps = as.integer(round(sum(wideDatd$dayTotal)))
 
 
 ```r
-# Make a time series plot (i.e. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+# Make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
 plotBreaks = c(0,500,1000,1500,2000)
 p2 = ggplot(wideDati, aes(x=factor(interval,levels=ordered(interval)), y=intvlMean, group=1)) +
         geom_line() +
@@ -83,7 +83,7 @@ print(p2)
 
 ```r
 # Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
-intvlMax = filter(wideDati, intvlMean==(max(as.numeric((intvlMean)))))
+intvlMax = filter(wideDati, intvlMean==(max(intvlMean)))
 ```
 
 Interval "835" is the 5-minute interval containing the maximum number of steps on average across all days, i.e., 206 steps.
@@ -100,7 +100,7 @@ The revised analysis below adjusts for the missing 2304 interval data instances 
 
 
 ```r
-# Update the raw data by replacing the NAs with the calculated mean for each 5-minute interval
+# Update the raw data by replacing each NA with the mean calculated for its 5-minute interval
 stepDat$steps = ifelse(is.na(stepDat$steps) == TRUE, as.integer(round(wideDati$intvlMean))[wideDati$interval %in% stepDat$interval], stepDat$steps)
 
 # For each date in the raw dataset indicate whether it is a weekday or a weekend day
@@ -109,12 +109,12 @@ stepDat = mutate(stepDat,weekdaysInd=(weekdays(stepDat$date) %in% weekday))
 
 # Rebuild the intermediate processing datasets
 
-# Format plot data by each of the 61 daily observations of the 288 5-minute intervals reported per day, adding the daily total and mean
+# Format plot data by each of the daily observations reported and calculate each day's total and mean
 wideDatd = dcast(stepDat, date ~ interval, value.var = "steps")
 wideDatd = mutate(wideDatd,dayTotal=rowSums(wideDatd[,2:289],na.rm=TRUE),
             dayMean=rowMeans(wideDatd[,2:289],na.rm=TRUE))
 
-# Format plot data by each of the 288 5-minute interval observations for the 61 days reported, adding the interval total and mean split by weekday and weekend dates
+# Format plot data by each of the daily 5-minute interval observations reported and calculate each interval's step total and mean, grouped by weekday and weekend date 
 wd = filter(stepDat,stepDat$weekdaysInd == TRUE) 
 wd = dcast(wd, interval ~ date, value.var = "steps") 
 wd = mutate(wd, weekdaysInd=TRUE, 
@@ -125,7 +125,9 @@ we = dcast(we, interval ~ date, value.var = "steps")
 we = mutate(we, weekdaysInd=FALSE, 
         intvlTotal=rowSums(we[,2:ncol(we)],na.rm=TRUE),
         intvlMean=rowMeans(we[,2:ncol(we)],na.rm=TRUE))
-wideDati = rbind(wd[,c(1,47,49)],we[,c(1,18,20)])
+
+# Combine interval ID, interval mean and weekday indicator for plotting
+wideDati = rbind(wd[,c(1,47,49)],we[,c(1,18,20)]) 
 wideDati$weekdaysInd = factor(wideDati$weekdaysInd,levels=c(TRUE,FALSE), labels=c("Weekday", "Weekend"))
 ```
 
@@ -134,14 +136,14 @@ wideDati$weekdaysInd = factor(wideDati$weekdaysInd,levels=c(TRUE,FALSE), labels=
 # Make a histogram of the total number of steps taken each day
 p3 = ggplot(wideDatd, aes(wideDatd$dayTotal)) + 
     geom_histogram(color = "black", fill = "lightblue", binwidth = 1000) +
-    labs(x = "Total Daily Steps Taken", y = "Number of Days")
+    labs(x = "Daily Total Steps Taken", y = "Number of Days")
 print(p3)
 ```
 
 ![](RepRes_PA1_RSA_files/figure-html/unnamed-chunk-7-1.png)<!-- -->
 
 ```r
-# Calculate and report the mean and median total number of steps taken per day.
+# Calculate and report the mean and median total number of steps taken per day
 adjMeanSteps = as.integer(round(mean(wideDatd$dayTotal)))
 adjMedianSteps = as.integer(round(median(wideDatd$dayTotal)))
 adjTotalSteps = as.integer(round(sum(wideDatd$dayTotal)))
@@ -154,22 +156,20 @@ diffMedian = adjMedianSteps - medianSteps
 difftotal = adjTotalSteps - totalSteps
 ```
 
-**Comparison of the original versus adjusted results (Replaced 8 rows of NAs with mean level data)** 
+**Comparison of the raw data versus adjusted data analysis results** 
 
-**Total Steps:** Original (570608); Adjusted (656704);
+**Total Steps:** Raw (570608); Adjusted (656704);
 Difference +86096    
-**Mean:** Original (9354); Adjusted (10766);
+**Mean:** Raw (9354); Adjusted (10766);
 Difference +1412    
-**Median:** Original (10395); Adjusted (10762);
+**Median:** Raw (10395); Adjusted (10762);
 Difference +367
 
 ## Are there differences in activity patterns between weekdays and weekends?
 
 
 ```r
-# Format plot data
-
-# Generate time series panel plot
+# Generate comparitive time series panel plot
 library(lattice)
 xyplot(intvlMean ~ interval | weekdaysInd,
     data=wideDati[order(wideDati$interval),],
